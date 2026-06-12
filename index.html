@@ -1,0 +1,1062 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tic-Tac-Toe</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #0D0D0F;
+      --card:     rgba(14, 14, 18, 0.78);
+      --fill:     rgba(28, 28, 34, 0.82);
+      --fill2:    rgba(42, 42, 50, 0.9);
+      --sep:      rgba(255, 255, 255, 0.08);
+      --text:     #F5F5F7;
+      --text2:    #98989D;
+      --text3:    #48484A;
+      --accent:   #0A84FF;
+      --claude:   #D97757;
+      --x:        #F5F5F7;
+      --o:        #0A84FF;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Helvetica Neue', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 28px 20px;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      overflow-x: hidden;
+    }
+
+    /* ── Aurora background ── */
+    .bg {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 0;
+      overflow: hidden;
+    }
+    .orb {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(120px);
+    }
+    .orb-a {
+      width: 720px; height: 640px;
+      background: #D97757;
+      opacity: 0.13;
+      top: -280px; left: -220px;
+      animation: driftA 20s ease-in-out infinite alternate;
+    }
+    .orb-b {
+      width: 640px; height: 580px;
+      background: #6B2FA0;
+      opacity: 0.11;
+      bottom: -220px; right: -180px;
+      animation: driftB 26s ease-in-out infinite alternate;
+      animation-delay: -12s;
+    }
+    .orb-c {
+      width: 520px; height: 460px;
+      background: #1A4F8A;
+      opacity: 0.09;
+      top: 45%; left: 50%;
+      transform: translate(-50%, -50%);
+      animation: driftC 17s ease-in-out infinite alternate;
+      animation-delay: -7s;
+    }
+    @keyframes driftA { to { transform: translate(70px, 80px) scale(1.05); } }
+    @keyframes driftB { to { transform: translate(-60px, -70px) scale(1.08); } }
+    @keyframes driftC {
+      from { transform: translate(-50%, -50%); }
+      to   { transform: translate(calc(-50% + 50px), calc(-50% + 40px)) scale(1.1); }
+    }
+
+    /* ── Particle canvas ── */
+    #net {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    /* ── Layout ── */
+    .layout {
+      position: relative;
+      z-index: 2;
+      width: 100%;
+      max-width: 860px;
+      display: flex;
+      gap: 16px;
+      align-items: flex-start;
+    }
+    .game-col { flex: 1; min-width: 0; }
+    .lb-col { width: 260px; flex-shrink: 0; }
+
+    @media (max-width: 660px) {
+      .layout { flex-direction: column; }
+      .lb-col { width: 100%; }
+    }
+
+    /* ── Card (frosted glass) ── */
+    .card {
+      background: var(--card);
+      border: 1px solid var(--sep);
+      border-radius: 20px;
+      overflow: hidden;
+      backdrop-filter: blur(32px) saturate(140%);
+      -webkit-backdrop-filter: blur(32px) saturate(140%);
+    }
+
+    /* ── Clawd mascot ── */
+    .mascot-wrap {
+      display: flex;
+      justify-content: center;
+      margin-bottom: 20px;
+    }
+    /* Reveal wrapper: fades+scales in on load */
+    .clawd-reveal {
+      animation: clawdReveal 0.4s cubic-bezier(0.34,1.56,0.64,1) 0.15s both;
+    }
+    @keyframes clawdReveal {
+      from { opacity: 0; transform: scale(0.75) translateY(12px); }
+      to   { opacity: 1; transform: none; }
+    }
+    /* Idle float + gentle sway */
+    .clawd-svg {
+      width: 154px;
+      height: auto;
+      display: block;
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+      animation: clawdIdle 3.4s ease-in-out 0.55s infinite;
+      transform-origin: center bottom;
+    }
+    @keyframes clawdIdle {
+      0%   { transform: translateY(0px)  rotate(0deg); }
+      25%  { transform: translateY(-4px) rotate(-1.5deg); }
+      50%  { transform: translateY(-8px) rotate(0deg); }
+      75%  { transform: translateY(-4px) rotate(1.5deg); }
+      100% { transform: translateY(0px)  rotate(0deg); }
+    }
+    /* Blink: orange overlay covers the black eyes */
+    .clawd-blink {
+      animation: clawdBlink 5.2s ease-in-out infinite;
+    }
+    .clawd-blink-r { animation-delay: 0.07s; }
+    @keyframes clawdBlink {
+      0%,89%,100% { opacity: 0; }
+      92%,96%     { opacity: 1; }
+    }
+
+    /* ── Setup ── */
+    .setup-body { padding: 28px 32px 32px; }
+
+    .setup-title {
+      font-size: 2rem;
+      font-weight: 700;
+      letter-spacing: -0.045em;
+      color: var(--text);
+      margin-bottom: 7px;
+    }
+    .setup-sub {
+      font-size: 0.875rem;
+      color: var(--text2);
+      margin-bottom: 30px;
+      letter-spacing: -0.01em;
+      min-height: 1.4em;
+    }
+    .cursor {
+      display: inline-block;
+      color: var(--claude);
+      font-weight: 300;
+      animation: blink 1s step-end infinite;
+    }
+    @keyframes blink { 0%,49%{opacity:1} 50%,100%{opacity:0} }
+
+    /* Segment */
+    .segment {
+      display: flex;
+      background: var(--fill);
+      border-radius: 11px;
+      padding: 3px;
+      margin-bottom: 24px;
+      position: relative;
+    }
+    .seg-thumb {
+      position: absolute;
+      top: 3px; bottom: 3px; left: 3px;
+      width: calc(50% - 3px);
+      background: var(--fill2);
+      border-radius: 9px;
+      box-shadow: 0 1px 6px rgba(0,0,0,0.55);
+      transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+      pointer-events: none;
+    }
+    .seg-thumb.right { transform: translateX(100%); }
+
+    .seg-btn {
+      flex: 1;
+      padding: 9px 16px;
+      border: none;
+      background: transparent;
+      color: var(--text2);
+      font-family: inherit;
+      font-size: 0.875rem;
+      font-weight: 500;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: color 0.15s;
+      position: relative;
+      z-index: 1;
+      letter-spacing: -0.01em;
+    }
+    .seg-btn.active { color: var(--text); font-weight: 600; }
+
+    /* Fields */
+    .fields { display: flex; gap: 12px; margin-bottom: 20px; }
+    .field { flex: 1; }
+    .field-label {
+      display: block;
+      font-size: 0.6875rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: var(--text3);
+      margin-bottom: 7px;
+    }
+    .field-label.lx { color: rgba(245,245,247,0.45); }
+    .field-label.lo { color: rgba(10,132,255,0.65); }
+    .field-label.lo.claude-mode { color: rgba(217,119,87,0.7); }
+
+    .field-input {
+      width: 100%;
+      background: var(--fill);
+      border: 1.5px solid transparent;
+      border-radius: 10px;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 0.9375rem;
+      padding: 11px 14px;
+      outline: none;
+      letter-spacing: -0.01em;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .field-input:focus { border-color: var(--accent); background: rgba(10,132,255,0.06); }
+    .field-input::placeholder { color: var(--text3); }
+    .field-input:disabled { opacity: 0.32; cursor: not-allowed; }
+
+    /* Buttons */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border: none;
+      font-family: inherit;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      cursor: pointer;
+      transition: opacity 0.12s, transform 0.1s;
+    }
+    .btn:active { transform: scale(0.97); }
+
+    .btn-primary {
+      width: 100%;
+      padding: 14px;
+      border-radius: 12px;
+      background: var(--accent);
+      color: #fff;
+      font-size: 0.9375rem;
+      position: relative;
+      overflow: hidden;
+    }
+    .btn-primary::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(105deg, transparent 40%, rgba(255,255,255,0.15) 50%, transparent 60%);
+      transform: translateX(-100%);
+      animation: shimmer 3s ease-in-out 1.2s infinite;
+    }
+    @keyframes shimmer { to { transform: translateX(200%); } }
+    .btn-primary:hover { opacity: 0.84; }
+
+    .btn-secondary {
+      padding: 9px 18px;
+      border-radius: 9px;
+      background: var(--fill);
+      color: var(--text);
+      font-size: 0.875rem;
+    }
+    .btn-secondary:hover { background: var(--fill2); }
+
+    .btn-text {
+      background: none;
+      padding: 6px 0;
+      font-size: 0.875rem;
+      font-weight: 500;
+      color: var(--accent);
+      letter-spacing: -0.01em;
+    }
+    .btn-text:hover { opacity: 0.65; }
+    .btn-text.red { color: #ff453a; }
+
+    /* ── Game nav ── */
+    .game-nav {
+      padding: 20px 26px 0;
+      display: flex;
+      align-items: center;
+    }
+    .back-btn {
+      display: flex;
+      align-items: center;
+      gap: 3px;
+      background: none;
+      border: none;
+      color: var(--accent);
+      font-family: inherit;
+      font-size: 0.9375rem;
+      font-weight: 400;
+      cursor: pointer;
+      padding: 4px 0;
+      letter-spacing: -0.01em;
+      transition: opacity 0.12s;
+    }
+    .back-btn:hover { opacity: 0.65; }
+
+    /* ── Score bar ── */
+    .scorebar {
+      display: flex;
+      align-items: flex-end;
+      padding: 24px 28px 0;
+    }
+    .sc-player { flex: 1; overflow: hidden; }
+    .sc-player.right { text-align: right; }
+
+    .sc-name {
+      font-size: 0.6875rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.065em;
+      color: var(--text2);
+      margin-bottom: 5px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .sc-player.right .sc-name { justify-content: flex-end; }
+
+    .sc-val {
+      font-size: 2.625rem;
+      font-weight: 700;
+      letter-spacing: -0.05em;
+      line-height: 1;
+    }
+    .x-side .sc-val { color: var(--x); }
+    .o-side .sc-val { color: var(--o); transition: color 0.3s; }
+
+    .sc-mid {
+      flex-shrink: 0;
+      padding: 0 20px;
+      text-align: center;
+      padding-bottom: 4px;
+    }
+    .sc-dash { font-size: 1.25rem; font-weight: 300; color: var(--text3); display: block; }
+    .sc-draws { font-size: 0.65rem; color: var(--text3); text-transform: uppercase; letter-spacing: 0.06em; margin-top: 4px; display: block; }
+
+    /* ── Turn row ── */
+    .turn-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 16px 28px 0;
+      min-height: 42px;
+    }
+    .turn-pip {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      transition: background 0.25s;
+    }
+    .turn-pip.x { background: var(--x); }
+    .turn-pip.o { background: var(--o); transition: background 0.3s; }
+
+    .turn-label {
+      font-size: 0.875rem;
+      color: var(--text2);
+      letter-spacing: -0.01em;
+    }
+    .turn-label strong { color: var(--text); font-weight: 600; }
+
+    /* ── AI row ── */
+    .ai-row { display: none; align-items: center; gap: 8px; padding: 12px 28px 0; }
+    .ai-row.show { display: flex; }
+    .ai-dots { display: flex; gap: 4px; }
+    .ai-dot {
+      width: 4px; height: 4px;
+      border-radius: 50%;
+      background: var(--claude);
+      animation: aiPulse 1.1s ease-in-out infinite;
+    }
+    .ai-dot:nth-child(2) { animation-delay: 0.18s; }
+    .ai-dot:nth-child(3) { animation-delay: 0.36s; }
+    @keyframes aiPulse { 0%,60%,100%{opacity:0.2} 30%{opacity:1} }
+    .ai-text { font-size: 0.8125rem; color: var(--claude); font-weight: 500; letter-spacing: -0.01em; }
+
+    /* ── Board ── */
+    .board-wrap { padding: 18px 22px; }
+    .board { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+
+    .cell {
+      aspect-ratio: 1;
+      background: var(--fill);
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      border: 1.5px solid transparent;
+      transition: background 0.1s, border-color 0.25s, transform 0.08s;
+    }
+    .cell:hover:not(.taken) { background: var(--fill2); }
+    .cell:active:not(.taken) { transform: scale(0.94); }
+    .cell.taken { cursor: default; }
+    .cell.win-x { background: rgba(245,245,247,0.05); border-color: rgba(245,245,247,0.16); }
+    .cell.win-o-blue { background: rgba(10,132,255,0.07); border-color: rgba(10,132,255,0.26); }
+    .cell.win-o-claude { background: rgba(217,119,87,0.07); border-color: rgba(217,119,87,0.28); }
+
+    /* SVG marks */
+    .mark {
+      width: 42%; height: 42%;
+      overflow: visible;
+      opacity: 0;
+      transform: scale(0.6);
+      transition: opacity 0.2s cubic-bezier(0.34,1.56,0.64,1),
+                  transform 0.2s cubic-bezier(0.34,1.56,0.64,1);
+    }
+    .mark.visible { opacity: 1; transform: scale(1); }
+
+    /* ── Result ── */
+    .result-wrap { padding: 0 22px 14px; display: none; }
+    .result-wrap.show { display: block; animation: riseIn 0.24s cubic-bezier(0.4,0,0.2,1); }
+    @keyframes riseIn { from{opacity:0;transform:translateY(7px)} to{opacity:1;transform:translateY(0)} }
+
+    .result-inner {
+      background: var(--fill);
+      border-radius: 13px;
+      padding: 15px 18px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+    .result-label {
+      font-size: 0.6875rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: var(--text2);
+      margin-bottom: 3px;
+    }
+    .result-name { font-size: 1.0625rem; font-weight: 700; letter-spacing: -0.03em; color: var(--text); }
+
+    /* ── Action bar ── */
+    .action-bar { padding: 0 26px 24px; display: flex; justify-content: flex-end; }
+
+    /* ── Leaderboard ── */
+    .lb-head { padding: 20px 20px 14px; border-bottom: 1px solid var(--sep); }
+    .lb-title { font-size: 0.6875rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.09em; color: var(--text2); }
+
+    .lb-row { display: flex; align-items: center; gap: 10px; padding: 11px 20px; transition: background 0.1s; }
+    .lb-row + .lb-row { border-top: 1px solid var(--sep); }
+    .lb-row:hover { background: rgba(255,255,255,0.02); }
+
+    .lb-num { font-size: 0.7rem; font-weight: 600; color: var(--text3); width: 14px; text-align: right; flex-shrink: 0; }
+    .lb-num.hi { color: var(--text2); }
+
+    .lb-av {
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.625rem; font-weight: 700; flex-shrink: 0;
+    }
+    .lb-info { flex: 1; min-width: 0; }
+    .lb-name { font-size: 0.875rem; font-weight: 500; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: -0.01em; }
+    .lb-meta { font-size: 0.65rem; color: var(--text3); margin-top: 1px; }
+    .lb-stat { text-align: right; flex-shrink: 0; }
+    .lb-wins { font-size: 0.9375rem; font-weight: 700; color: var(--text); letter-spacing: -0.03em; }
+    .lb-wr { font-size: 0.625rem; color: var(--text3); }
+
+    .lb-empty { padding: 36px 20px; text-align: center; color: var(--text3); font-size: 0.8125rem; line-height: 1.65; letter-spacing: -0.01em; }
+    .lb-foot { padding: 10px 18px 14px; border-top: 1px solid var(--sep); display: flex; justify-content: flex-end; }
+
+    /* Claude score badge */
+    .claude-score-badge { opacity: 0.75; flex-shrink: 0; }
+  </style>
+</head>
+<body>
+
+<!-- Aurora background -->
+<div class="bg">
+  <div class="orb orb-a"></div>
+  <div class="orb orb-b"></div>
+  <div class="orb orb-c"></div>
+</div>
+
+<!-- Particle network -->
+<canvas id="net"></canvas>
+
+<div class="layout">
+
+  <!-- Game column -->
+  <div class="game-col">
+
+    <!-- Setup -->
+    <div class="card" id="setup-card">
+      <div class="setup-body">
+
+        <!-- Claude Code pixel art mascot (Clawd) -->
+        <div class="mascot-wrap">
+          <div class="clawd-reveal">
+            <svg class="clawd-svg" viewBox="0 0 132 84" xmlns="http://www.w3.org/2000/svg" style="image-rendering:pixelated;image-rendering:crisp-edges">
+              <!-- HEAD: cols 2-8 (x=24–108), rows 0-2 (y=0–36) -->
+              <rect x="24" y="0" width="84" height="36" fill="#CC785C"/>
+              <!-- LEFT EYE: col 3 (x=36–48), row 1 (y=12–24) -->
+              <rect x="36" y="12" width="12" height="12" fill="#111111"/>
+              <!-- RIGHT EYE: col 7 (x=84–96), row 1 (y=12–24) -->
+              <rect x="84" y="12" width="12" height="12" fill="#111111"/>
+              <!-- BLINK overlays: same-color rect animates to opacity:1 -->
+              <rect class="clawd-blink"           x="36" y="12" width="12" height="12" fill="#CC785C" opacity="0"/>
+              <rect class="clawd-blink clawd-blink-r" x="84" y="12" width="12" height="12" fill="#CC785C" opacity="0"/>
+              <!-- ARMS: full width (x=0–132), row 3 (y=36–48) -->
+              <rect x="0" y="36" width="132" height="12" fill="#CC785C"/>
+              <!-- BODY: cols 2-8 (x=24–108), row 4 (y=48–60) -->
+              <rect x="24" y="48" width="84" height="12" fill="#CC785C"/>
+              <!-- LEFT LEG: cols 3-4 (x=36–60), rows 5-6 (y=60–84) -->
+              <rect x="36" y="60" width="24" height="24" fill="#CC785C"/>
+              <!-- RIGHT LEG: cols 6-7 (x=72–96), rows 5-6 (y=60–84) -->
+              <rect x="72" y="60" width="24" height="24" fill="#CC785C"/>
+            </svg>
+          </div>
+        </div>
+
+        <div class="setup-title">Tic-Tac-Toe</div>
+        <div class="setup-sub" id="setup-sub">
+          <span id="sub-text"></span><span class="cursor" id="type-cursor">|</span>
+        </div>
+
+        <div class="segment">
+          <div class="seg-thumb" id="seg-thumb"></div>
+          <button class="seg-btn active" id="pvp-btn" onclick="setMode('pvp')">Two Players</button>
+          <button class="seg-btn" id="ai-btn" onclick="setMode('ai')">vs Claude</button>
+        </div>
+
+        <div class="fields">
+          <div class="field">
+            <label class="field-label lx">Player X</label>
+            <input class="field-input" type="text" id="p1-name" placeholder="Your name" maxlength="16">
+          </div>
+          <div class="field" id="p2-field">
+            <label class="field-label lo" id="p2-label">Player O</label>
+            <input class="field-input" type="text" id="p2-name" placeholder="Friend's name" maxlength="16">
+          </div>
+        </div>
+
+        <button class="btn btn-primary" onclick="startGame()">Play</button>
+      </div>
+    </div>
+
+    <!-- Game -->
+    <div class="card" id="game-card" style="display:none">
+
+      <div class="game-nav">
+        <button class="back-btn" onclick="goHome()">
+          <svg width="8" height="13" viewBox="0 0 8 13" fill="none">
+            <path d="M7 1L1 6.5L7 12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          Menu
+        </button>
+      </div>
+
+      <div class="scorebar">
+        <div class="sc-player x-side">
+          <div class="sc-name"><span id="sc-name-x">Player X</span></div>
+          <div class="sc-val" id="sc-val-x">0</div>
+        </div>
+        <div class="sc-mid">
+          <span class="sc-dash">—</span>
+          <span class="sc-draws"><span id="sc-draws">0</span> draws</span>
+        </div>
+        <div class="sc-player o-side right">
+          <div class="sc-name">
+            <!-- Claude mark badge shown in Claude mode -->
+            <span class="claude-score-badge" id="claude-score-badge" style="display:none">
+              <svg width="12" height="11" viewBox="0 0 58 54" fill="#D97757">
+                <rect x="26" y="14" width="6" height="40" rx="3"/>
+                <rect x="26" y="19" width="6" height="35" rx="3" transform="rotate(-11,29,54)"/>
+                <rect x="26" y="19" width="6" height="35" rx="3" transform="rotate(11,29,54)"/>
+                <rect x="26" y="26" width="6" height="28" rx="3" transform="rotate(-22,29,54)"/>
+                <rect x="26" y="26" width="6" height="28" rx="3" transform="rotate(22,29,54)"/>
+              </svg>
+            </span>
+            <span id="sc-name-o">Player O</span>
+          </div>
+          <div class="sc-val" id="sc-val-o">0</div>
+        </div>
+      </div>
+
+      <div class="turn-row" id="turn-row">
+        <div class="turn-pip" id="turn-pip"></div>
+        <div class="turn-label" id="turn-label"></div>
+      </div>
+
+      <div class="ai-row" id="ai-row">
+        <div class="ai-dots">
+          <div class="ai-dot"></div>
+          <div class="ai-dot"></div>
+          <div class="ai-dot"></div>
+        </div>
+        <div class="ai-text">Claude is thinking</div>
+      </div>
+
+      <div class="board-wrap">
+        <div class="board" id="board"></div>
+      </div>
+
+      <div class="result-wrap" id="result-wrap">
+        <div class="result-inner">
+          <div>
+            <div class="result-label" id="result-label">Winner</div>
+            <div class="result-name" id="result-name"></div>
+          </div>
+          <button class="btn btn-secondary" onclick="nextRound()">Next Round</button>
+        </div>
+      </div>
+
+      <div class="action-bar">
+        <button class="btn btn-text" onclick="resetBoard()">Reset Board</button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Leaderboard -->
+  <div class="lb-col">
+    <div class="card">
+      <div class="lb-head"><div class="lb-title">Leaderboard</div></div>
+      <div id="lb-body">
+        <div class="lb-empty">No games recorded yet.<br>Start playing to see rankings.</div>
+      </div>
+      <div class="lb-foot">
+        <button class="btn btn-text red" onclick="clearLeaderboard()">Clear All</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ── Particle network ──────────────────────────────────────────
+(function() {
+  const canvas = document.getElementById('net');
+  const ctx = canvas.getContext('2d');
+  let W, H, pts;
+  const N = 50, LINK = 150;
+  let mouse = { x: -999, y: -999 };
+
+  function resize() {
+    W = canvas.width = innerWidth;
+    H = canvas.height = innerHeight;
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  pts = Array.from({ length: N }, () => ({
+    x: Math.random() * W,
+    y: Math.random() * H,
+    vx: (Math.random() - 0.5) * 0.45,
+    vy: (Math.random() - 0.5) * 0.45,
+    r: 0.8 + Math.random() * 1.4,
+    warm: Math.random() > 0.45
+  }));
+
+  document.addEventListener('mousemove', e => { mouse.x = e.clientX; mouse.y = e.clientY; });
+
+  function tick() {
+    ctx.clearRect(0, 0, W, H);
+
+    for (const p of pts) {
+      // Mouse repulsion
+      const mdx = p.x - mouse.x, mdy = p.y - mouse.y;
+      const md = Math.hypot(mdx, mdy);
+      if (md < 90) {
+        const f = ((90 - md) / 90) * 0.6;
+        p.vx += (mdx / md) * f;
+        p.vy += (mdy / md) * f;
+      }
+      // Speed cap
+      const spd = Math.hypot(p.vx, p.vy);
+      if (spd > 1.8) { p.vx = p.vx / spd * 1.8; p.vy = p.vy / spd * 1.8; }
+
+      p.x += p.vx; p.y += p.vy;
+      if (p.x < 0) { p.x = 0; p.vx *= -1; }
+      if (p.x > W) { p.x = W; p.vx *= -1; }
+      if (p.y < 0) { p.y = 0; p.vy *= -1; }
+      if (p.y > H) { p.y = H; p.vy *= -1; }
+    }
+
+    // Connections
+    for (let i = 0; i < N; i++) {
+      for (let j = i + 1; j < N; j++) {
+        const d = Math.hypot(pts[i].x - pts[j].x, pts[i].y - pts[j].y);
+        if (d < LINK) {
+          const a = (1 - d / LINK) * 0.13;
+          ctx.strokeStyle = pts[i].warm || pts[j].warm
+            ? `rgba(217,119,87,${a})`
+            : `rgba(200,200,220,${a * 0.6})`;
+          ctx.lineWidth = 0.8;
+          ctx.beginPath();
+          ctx.moveTo(pts[i].x, pts[i].y);
+          ctx.lineTo(pts[j].x, pts[j].y);
+          ctx.stroke();
+        }
+      }
+    }
+
+    // Dots
+    for (const p of pts) {
+      const a = p.warm ? 0.28 : 0.18;
+      ctx.fillStyle = p.warm ? `rgba(217,119,87,${a})` : `rgba(245,245,247,${a})`;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    requestAnimationFrame(tick);
+  }
+  tick();
+})();
+
+// ── Typewriter ────────────────────────────────────────────────
+(function() {
+  const el = document.getElementById('sub-text');
+  const cur = document.getElementById('type-cursor');
+  const text = 'Challenge a friend or take on Claude.';
+  let i = 0;
+  function type() {
+    if (i <= text.length) {
+      el.textContent = text.slice(0, i++);
+      setTimeout(type, i < text.length ? 38 : 800);
+    } else {
+      cur.style.display = 'none';
+    }
+  }
+  setTimeout(type, 700);
+})();
+
+// ── Game state ────────────────────────────────────────────────
+let board = Array(9).fill(null);
+let current = 'X';
+let over = false;
+let mode = 'pvp';
+let oColor = '#0A84FF';
+let players = { X: 'Player X', O: 'Player O' };
+let session = { X: 0, O: 0, D: 0 };
+let lb = JSON.parse(localStorage.getItem('ttt_lb') || '{}');
+const WINS = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+
+// ── Mode ──────────────────────────────────────────────────────
+function setMode(m) {
+  mode = m;
+  document.getElementById('pvp-btn').classList.toggle('active', m === 'pvp');
+  document.getElementById('ai-btn').classList.toggle('active', m === 'ai');
+  document.getElementById('seg-thumb').classList.toggle('right', m === 'ai');
+
+  const inp = document.getElementById('p2-name');
+  const lbl = document.getElementById('p2-label');
+  const field = document.getElementById('p2-field');
+
+  if (m === 'ai') {
+    inp.value = 'Claude'; inp.disabled = true;
+    field.style.opacity = '0.35';
+    lbl.classList.add('claude-mode');
+    oColor = '#D97757';
+  } else {
+    inp.disabled = false; field.style.opacity = '1';
+    if (inp.value === 'Claude') inp.value = '';
+    lbl.classList.remove('claude-mode');
+    oColor = '#0A84FF';
+  }
+  document.documentElement.style.setProperty('--o', oColor);
+}
+
+// ── Start / nav ───────────────────────────────────────────────
+function startGame() {
+  players.X = document.getElementById('p1-name').value.trim() || 'Player X';
+  players.O = mode === 'ai' ? 'Claude' : (document.getElementById('p2-name').value.trim() || 'Player O');
+  session = { X: 0, O: 0, D: 0 };
+
+  document.getElementById('sc-name-x').textContent = players.X;
+  document.getElementById('sc-name-o').textContent = players.O;
+  document.getElementById('claude-score-badge').style.display = mode === 'ai' ? 'inline-flex' : 'none';
+
+  document.getElementById('setup-card').style.display = 'none';
+  document.getElementById('game-card').style.display = 'block';
+  buildBoard();
+  resetBoard();
+}
+
+function goHome() {
+  document.getElementById('game-card').style.display = 'none';
+  document.getElementById('setup-card').style.display = 'block';
+}
+
+// ── Board ─────────────────────────────────────────────────────
+function buildBoard() {
+  document.getElementById('board').innerHTML =
+    Array.from({ length: 9 }, (_, i) =>
+      `<div class="cell" id="c${i}" onclick="cellClick(${i})"></div>`
+    ).join('');
+}
+
+function resetBoard() {
+  board = Array(9).fill(null);
+  current = 'X';
+  over = false;
+  document.getElementById('result-wrap').classList.remove('show');
+  document.getElementById('ai-row').classList.remove('show');
+  for (let i = 0; i < 9; i++) {
+    const el = document.getElementById('c' + i);
+    el.className = 'cell';
+    el.onclick = () => cellClick(i);
+    el.innerHTML = '';
+  }
+  setTurn(); showTurnRow(true);
+}
+
+function cellClick(i) {
+  if (over || board[i]) return;
+  if (mode === 'ai' && current === 'O') return;
+  move(i);
+}
+
+function move(i) {
+  board[i] = current;
+  const cell = document.getElementById('c' + i);
+  cell.classList.add('taken');
+  placeMark(cell, current);
+
+  const win = checkWin();
+  if (win) { endGame(current, win); return; }
+  if (board.every(Boolean)) { endGame(null); return; }
+
+  current = current === 'X' ? 'O' : 'X';
+  setTurn();
+
+  if (mode === 'ai' && current === 'O' && !over) {
+    showTurnRow(false);
+    document.getElementById('ai-row').classList.add('show');
+    setTimeout(aiMove, 480 + Math.random() * 320);
+  }
+}
+
+function placeMark(cell, player) {
+  const ns = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(ns, 'svg');
+  svg.setAttribute('viewBox', '0 0 40 40');
+  svg.classList.add('mark');
+  svg.style.overflow = 'visible';
+
+  if (player === 'X') {
+    [[8,8,32,32],[32,8,8,32]].forEach(([x1,y1,x2,y2]) => {
+      const l = document.createElementNS(ns, 'line');
+      l.setAttribute('x1',x1); l.setAttribute('y1',y1);
+      l.setAttribute('x2',x2); l.setAttribute('y2',y2);
+      l.setAttribute('stroke','#F5F5F7');
+      l.setAttribute('stroke-width','2.8');
+      l.setAttribute('stroke-linecap','round');
+      l.style.cssText = 'stroke-dasharray:34;stroke-dashoffset:34';
+      svg.appendChild(l);
+    });
+  } else {
+    const c = document.createElementNS(ns, 'circle');
+    c.setAttribute('cx','20'); c.setAttribute('cy','20'); c.setAttribute('r','12');
+    c.setAttribute('stroke', oColor);
+    c.setAttribute('stroke-width','2.8');
+    c.setAttribute('fill','none');
+    c.style.cssText = 'stroke-dasharray:76;stroke-dashoffset:76';
+    svg.appendChild(c);
+  }
+
+  cell.appendChild(svg);
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    svg.classList.add('visible');
+    svg.querySelectorAll('line, circle').forEach(el => {
+      el.style.transition = 'stroke-dashoffset 0.22s ease';
+      el.style.strokeDashoffset = '0';
+    });
+  }));
+}
+
+function aiMove() {
+  document.getElementById('ai-row').classList.remove('show');
+  showTurnRow(true);
+  const best = minimax([...board], 'O');
+  move(best.index);
+}
+
+function checkWin() {
+  for (const [a,b,c] of WINS) {
+    if (board[a] && board[a] === board[b] && board[a] === board[c]) return [a,b,c];
+  }
+  return null;
+}
+
+// ── Minimax (alpha-beta pruning) ──────────────────────────────
+function minimax(b, player, depth=0, alpha=-Infinity, beta=Infinity) {
+  const w = winnerOf(b);
+  if (w === 'O') return { score: 10 - depth };
+  if (w === 'X') return { score: depth - 10 };
+  const empty = b.reduce((a,v,i) => v ? a : [...a,i], []);
+  if (!empty.length) return { score: 0 };
+  let best = player === 'O' ? { score: -Infinity } : { score: Infinity };
+  for (const i of empty) {
+    b[i] = player;
+    const r = minimax(b, player==='O'?'X':'O', depth+1, alpha, beta);
+    b[i] = null; r.index = i;
+    if (player === 'O') {
+      if (r.score > best.score) best = r;
+      alpha = Math.max(alpha, best.score);
+    } else {
+      if (r.score < best.score) best = r;
+      beta = Math.min(beta, best.score);
+    }
+    if (beta <= alpha) break;
+  }
+  return best;
+}
+
+function winnerOf(b) {
+  for (const [a,bc,c] of WINS) {
+    if (b[a] && b[a]===b[bc] && b[a]===b[c]) return b[a];
+  }
+  return null;
+}
+
+// ── End game ──────────────────────────────────────────────────
+function endGame(winner, winCells) {
+  over = true;
+  showTurnRow(false);
+
+  if (winner) {
+    const winClass = winner === 'X' ? 'win-x'
+                   : mode === 'ai'  ? 'win-o-claude' : 'win-o-blue';
+    winCells.forEach(i => document.getElementById('c'+i).classList.add(winClass));
+    session[winner]++;
+    document.getElementById('result-label').textContent = 'Winner';
+    document.getElementById('result-name').textContent = players[winner];
+    recordLb(players[winner], 'win');
+  } else {
+    session.D++;
+    document.getElementById('result-label').textContent = 'Result';
+    document.getElementById('result-name').textContent = 'Draw';
+    recordLb(players.X, 'draw'); recordLb(players.O, 'draw');
+  }
+
+  document.getElementById('result-wrap').classList.add('show');
+  syncScores(winner);
+  renderLb();
+}
+
+function nextRound() { resetBoard(); }
+
+// ── UI helpers ────────────────────────────────────────────────
+function setTurn() {
+  document.getElementById('turn-pip').className = 'turn-pip ' + current.toLowerCase();
+  document.getElementById('turn-label').innerHTML =
+    `<strong>${players[current]}</strong>'s turn`;
+}
+
+function showTurnRow(v) {
+  document.getElementById('turn-row').style.visibility = v ? '' : 'hidden';
+}
+
+function syncScores(winner) {
+  document.getElementById('sc-val-x').textContent = session.X;
+  document.getElementById('sc-val-o').textContent = session.O;
+  document.getElementById('sc-draws').textContent = session.D;
+  if (winner) {
+    const el = document.getElementById('sc-val-' + winner.toLowerCase());
+    el.animate(
+      [{ transform:'scale(1)' }, { transform:'scale(1.24)' }, { transform:'scale(1)' }],
+      { duration: 320, easing: 'cubic-bezier(0.34,1.56,0.64,1)' }
+    );
+  }
+}
+
+// ── Leaderboard ───────────────────────────────────────────────
+function recordLb(name, result) {
+  if (!lb[name]) lb[name] = { wins:0, losses:0, draws:0, games:0 };
+  lb[name].games++;
+  if (result === 'win') {
+    lb[name].wins++;
+    const opp = name === players.X ? players.O : players.X;
+    if (!lb[opp]) lb[opp] = { wins:0, losses:0, draws:0, games:0 };
+    lb[opp].games++; lb[opp].losses++;
+  } else {
+    lb[name].draws++;
+  }
+  localStorage.setItem('ttt_lb', JSON.stringify(lb));
+}
+
+function renderLb() {
+  const body = document.getElementById('lb-body');
+  const rows = Object.entries(lb)
+    .map(([name,s]) => ({ name, ...s, wr: s.games ? Math.round(s.wins/s.games*100) : 0 }))
+    .sort((a,b) => b.wins-a.wins || b.wr-a.wr);
+
+  if (!rows.length) {
+    body.innerHTML = '<div class="lb-empty">No games recorded yet.<br>Start playing to see rankings.</div>';
+    return;
+  }
+
+  const palette = ['#D97757','#0A84FF','#30D158','#BF5AF2','#64D2FF','#FF9F0A','#FF6961'];
+  const hue = n => { let h=0; for(const c of n) h=(h*31+c.charCodeAt(0))&0xffff; return palette[h%palette.length]; };
+  const inits = n => n.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2)||'?';
+
+  body.innerHTML = rows.slice(0,10).map((e,i) => {
+    const col = hue(e.name);
+    return `<div class="lb-row">
+      <div class="lb-num ${i<3?'hi':''}">${i+1}</div>
+      <div class="lb-av" style="background:${col}18;color:${col}">${inits(e.name)}</div>
+      <div class="lb-info">
+        <div class="lb-name">${e.name}</div>
+        <div class="lb-meta">${e.games}G &middot; ${e.losses}L &middot; ${e.draws}D</div>
+      </div>
+      <div class="lb-stat">
+        <div class="lb-wins">${e.wins}W</div>
+        <div class="lb-wr">${e.wr}%</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function clearLeaderboard() {
+  if (!confirm('Clear all leaderboard records?')) return;
+  lb = {}; localStorage.removeItem('ttt_lb'); renderLb();
+}
+
+renderLb();
+</script>
+</body>
+</html>
