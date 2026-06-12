@@ -2,7 +2,7 @@
 
 A polished, single-file Tic Tac Toe game with an AI opponent, persistent leaderboard, and a clean dark interface inspired by Apple's design language and the Claude Code aesthetic.
 
-**[Play it live →](https://kapoortanmay.github.io/tictactoe/)**
+**[Play it live →](https://kapoortanmay.github.io/playwithclaude/)**
 
 ---
 
@@ -69,7 +69,7 @@ No installation required.
 
 ```bash
 # Clone the repo
-git clone https://github.com/Kapoortanmay/tictactoe.git
+git clone https://github.com/Kapoortanmay/playwithclaude.git
 
 # Open in browser
 open tictactoe/index.html
