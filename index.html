@@ -983,8 +983,12 @@ function nextRound() { resetBoard(); }
 // ── UI helpers ────────────────────────────────────────────────
 function setTurn() {
   document.getElementById('turn-pip').className = 'turn-pip ' + current.toLowerCase();
-  document.getElementById('turn-label').innerHTML =
-    `<strong>${players[current]}</strong>'s turn`;
+  const label = document.getElementById('turn-label');
+  label.textContent = '';
+  const strong = document.createElement('strong');
+  strong.textContent = players[current];
+  label.appendChild(strong);
+  label.appendChild(document.createTextNode("'s turn"));
 }
 
 function showTurnRow(v) {
@@ -1034,21 +1038,58 @@ function renderLb() {
   const hue = n => { let h=0; for(const c of n) h=(h*31+c.charCodeAt(0))&0xffff; return palette[h%palette.length]; };
   const inits = n => n.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2)||'?';
 
-  body.innerHTML = rows.slice(0,10).map((e,i) => {
+  const frag = document.createDocumentFragment();
+  rows.slice(0,10).forEach((e,i) => {
     const col = hue(e.name);
-    return `<div class="lb-row">
-      <div class="lb-num ${i<3?'hi':''}">${i+1}</div>
-      <div class="lb-av" style="background:${col}18;color:${col}">${inits(e.name)}</div>
-      <div class="lb-info">
-        <div class="lb-name">${e.name}</div>
-        <div class="lb-meta">${e.games}G &middot; ${e.losses}L &middot; ${e.draws}D</div>
-      </div>
-      <div class="lb-stat">
-        <div class="lb-wins">${e.wins}W</div>
-        <div class="lb-wr">${e.wr}%</div>
-      </div>
-    </div>`;
-  }).join('');
+
+    const row = document.createElement('div');
+    row.className = 'lb-row';
+
+    const num = document.createElement('div');
+    num.className = 'lb-num' + (i<3 ? ' hi' : '');
+    num.textContent = i+1;
+    row.appendChild(num);
+
+    const av = document.createElement('div');
+    av.className = 'lb-av';
+    av.style.background = col + '18';
+    av.style.color = col;
+    av.textContent = inits(e.name);
+    row.appendChild(av);
+
+    const info = document.createElement('div');
+    info.className = 'lb-info';
+
+    const name = document.createElement('div');
+    name.className = 'lb-name';
+    name.textContent = e.name;
+    info.appendChild(name);
+
+    const meta = document.createElement('div');
+    meta.className = 'lb-meta';
+    meta.textContent = e.games + 'G · ' + e.losses + 'L · ' + e.draws + 'D';
+    info.appendChild(meta);
+
+    row.appendChild(info);
+
+    const stat = document.createElement('div');
+    stat.className = 'lb-stat';
+
+    const wins = document.createElement('div');
+    wins.className = 'lb-wins';
+    wins.textContent = e.wins + 'W';
+    stat.appendChild(wins);
+
+    const wr = document.createElement('div');
+    wr.className = 'lb-wr';
+    wr.textContent = e.wr + '%';
+    stat.appendChild(wr);
+
+    row.appendChild(stat);
+    frag.appendChild(row);
+  });
+  body.textContent = '';
+  body.appendChild(frag);
 }
 
 function clearLeaderboard() {
